@@ -1,0 +1,57 @@
+# Имя workflow — отображается во вкладке Actions на GitHub
+name: CI
+
+# ТРИГГЕРЫ: когда запускать этот пайплайн
+on:
+  push:
+    branches: [ main ]        # на каждый push в main
+  pull_request:
+    branches: [ main ]        # и на каждый PR в main (проверяем до мёржа)
+
+jobs:
+  # ===== JOB 1: тесты =====
+  test:
+    runs-on: ubuntu-latest    # чистая виртуалка Ubuntu
+    steps:
+      - name: Checkout code               # забрать код репозитория на runner
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -v
+
+  # ===== JOB 2: сборка и публикация образа =====
+  build-and-push:
+    needs: test               # стартует ТОЛЬКО если job "test" прошёл успешно
+    runs-on: ubuntu-latest
+    # собираем образ только на push в main, а не на каждом PR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write         # разрешение пушить образ в GitHub Container Registry
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN создаётся автоматически — свои секреты заводить НЕ нужно
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # имя образа в нижнем регистре: ghcr.io/<owner>/<repo>:latest
+          tags: ghcr.io/${{ github.repository }}:latest
