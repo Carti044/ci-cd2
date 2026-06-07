@@ -54,4 +54,4 @@ jobs:
           context: .
           push: true
           # имя образа в нижнем регистре: ghcr.io/<owner>/<repo>:latest
-          tags: ghcr.io/${{ github.repository }}:latest
+           tags: ghcr.io/carti044/ci-cd2:latest
